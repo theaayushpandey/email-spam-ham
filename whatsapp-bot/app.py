@@ -14,7 +14,7 @@ from xml.sax.saxutils import escape
 import joblib
 from flask import Flask, Response, jsonify, request
 
-from text_utils import transform_text
+from text_utils import clean_text
 
 HERE = Path(__file__).parent
 FEEDBACK_FILE = HERE / "feedback.csv"
@@ -22,7 +22,7 @@ MAX_LENGTH = 2000
 
 # Load the model once at startup, not on every message
 saved = joblib.load(HERE / "model.joblib")
-vectorizer, model = saved["vectorizer"], saved["model"]
+model, known_words = saved["model"], saved["known_words"]
 
 app = Flask(__name__)
 
@@ -31,8 +31,9 @@ app = Flask(__name__)
 last_check = {}
 
 HELP_TEXT = (
-    "Hi! Forward me any SMS or message you are unsure about and I will tell you "
-    "if it looks like spam.\n\nIf I get one wrong, reply WRONG and I will learn from it."
+    "Hi! Forward me any SMS or message you are unsure about, in English or Hinglish, "
+    "and I will tell you if it looks like spam.\n\n"
+    "If I get one wrong, reply WRONG and I will learn from it."
 )
 
 
@@ -42,12 +43,12 @@ def classify(text):
     spam_probability is how sure the model is about THIS message. It is not the
     model's accuracy, which is measured once on the test set in train.py.
     """
-    vector = vectorizer.transform([transform_text(text)])
-    if vector.nnz == 0:
-        # None of the words are in the vocabulary, so the model would only be guessing
+    if not known_words.intersection(clean_text(text).split()):
+        # None of the words are in the vocabulary, so the model would only be guessing.
+        # A bare link or phone number counts as no words: there is nothing to read.
         return {"label": "unknown", "spam_probability": None}
 
-    probability = float(model.predict_proba(vector)[0][1])
+    probability = float(model.predict_proba([text])[0][1])
     if probability >= 0.7:
         label = "spam"
     elif probability <= 0.3:
@@ -58,7 +59,7 @@ def classify(text):
 
 
 def percent(probability):
-    # Naive Bayes is overconfident and often outputs exactly 0 or 1, so never show 0% or 100%
+    # The model can output values that round to 0 or 1, but it is never certain: don't show 0% or 100%
     return f"{min(max(probability, 0.01), 0.99):.0%}"
 
 
