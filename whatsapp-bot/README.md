@@ -22,7 +22,7 @@ You on WhatsApp <-- Twilio <-- reply as TwiML (XML)
 
 ## Training data
 
-The notebook's data is English SMS from the UK and Singapore, collected before 2012. It has no "KYC", "UPI" or "lakh" in it and no Hinglish. `build_data.py` adds Indian and Hinglish messages to it.
+The notebook's data is English SMS from the UK and Singapore, collected before 2012. It has no "KYC" or "UPI" in it and almost no Hinglish. `build_data.py` adds Indian and Hinglish messages to it.
 
 | Source | Messages | What it is | Licence |
 | --- | --- | --- | --- |
@@ -86,7 +86,7 @@ python app.py
 Test it without WhatsApp:
 
 ```bash
-curl -X POST http://localhost:5001/predict -H "Content-Type: application/json" -d "{\"text\": \"Aapka KYC expire ho gaya hai, turant update karein\"}"
+curl -X POST http://localhost:5001/predict -H "Content-Type: application/json" -d "{\"text\": \"Aapka KYC expire ho gaya hai, turant update karein warna account block ho jayega: http://sbi-kyc.xyz\"}"
 ```
 
 ## Connect it to WhatsApp
@@ -101,6 +101,7 @@ curl -X POST http://localhost:5001/predict -H "Content-Type: application/json" -
 
 - The Indian and Hinglish training data is synthetic. Real scams are messier and change over time. The WRONG reply exists to collect real ones, and that is the only route to a model that can be trusted on Hinglish.
 - Heavily shortened Hinglish is still missed. "apka kyc expir ho gya h, turnt update kro" is judged safe, because the training messages are spelled out in full.
+- Short fragments are missed too. "Aapka KYC expire ho gaya hai, turant update karein" on its own is judged safe (27%); with "warna account block ho jayega" and a link it is caught (99%).
 - Genuine bank, bill and courier messages are the hardest case: 7 of 61 genuine Hinglish ones were flagged in the test.
 - The model leans on phone numbers. In the training data they appear almost only in scams, so a friend sending "mera naya number 98..." gets "not sure".
 - Links are replaced with a placeholder before the model sees them, so it cannot tell `sbi.co.in` from `sbi-kyc.xyz`. It judges the words around the link.
